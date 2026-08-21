@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Microphone Visualizer</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #0b0f19;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: sans-serif;
+        }
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        #startBtn {
+            position: relative;
+            z-index: 10;
+            padding: 15px 30px;
+            font-size: 18px;
+            background-color: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            transition: background 0.2s;
+        }
+        #startBtn:hover { background-color: #2563eb; }
+    </style>
+</head>
+<body>
+
+    <button id="startBtn">Click to Start Visualizer</button>
+    <canvas id="visualizer"></canvas>
+
+    <script>
+        const startBtn = document.getElementById('startBtn');
+        const canvas = document.getElementById('visualizer');
+        const ctx = canvas.getContext('2d');
+
+        // Resize canvas dynamically
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        startBtn.addEventListener('click', async () => {
+            startBtn.style.display = 'none'; // Hide button after click
+
+            try {
+                // Request live microphone access
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                
+                // Set up Web Audio API
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const source = audioCtx.createMediaStreamSource(stream);
+                const analyser = audioCtx.createAnalyser();
+                
+                analyser.fftSize = 256; 
+                const bufferLength = analyser.frequencyBinCount;
+                const dataArray = new Uint8Array(bufferLength);
+                
+                source.connect(analyser);
+
+                // Animation loop
+                function draw() {
+                    requestAnimationFrame(draw);
+                    analyser.getByteFrequencyData(dataArray);
+
+                    // Clear canvas with a slight trail effect
+                    ctx.fillStyle = 'rgba(11, 15, 25, 0.2)';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                    const barWidth = (canvas.width / bufferLength) * 1.5;
+                    let x = 0;
+
+                    for (let i = 0; i < bufferLength; i++) {
+                        const barHeight = (dataArray[i] / 255) * canvas.height * 0.7;
+                        
+                        // Dynamic neon gradient colors based on frequency and sound level
+                        const red = Math.min(255, i * 4 + 100);
+                        const green = Math.min(255, dataArray[i] * 0.8 + 50);
+                        const blue = 255;
+                        
+                        ctx.fillStyle = `rgb(${red}, ${green}, ${blue})`;
+                        
+                        // Draw bars centered vertically
+                        ctx.fillRect(x, (canvas.height - barHeight) / 2, barWidth - 2, barHeight);
+                        x += barWidth;
+                    }
+                }
+                draw();
+
+            } catch (err) {
+                alert('Microphone access is required for the visualizer to work!');
+                startBtn.style.display = 'block';
+                console.error(err);
+            }
+        });
+    </script>
+</body>
+</html>
